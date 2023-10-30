@@ -1,0 +1,101 @@
+from shared import getCsv, nullMe
+
+#atomic
+#MembershipNo,MembershipName,OrgName,Address1,Address2,PostTown,PostCode,Country,SingleFamily,Title1,FirstName1,LastName1,Title2,FirstName2,LastName2,CardName1,CardName2,CurrentPrice,ags_subscription_id,ags_subscription_name,ags_subscription_start_date,ags_subscription_end_date,ags_subscription_status,ags_payment_discrepancy,ags_payment_discrepancy_amount
+
+#INSERT INTO `registeredusertable` VALUES (3,'910623F','chris','Chris','McGregor','d11r03b79','mcgregor546@gmail.com','primary'),(
+#id   | membershipno | userid     | prename    | surname   | password      | email                        | status
+def get_registered_user_insert(id,membership_no,first_name,last_name,password,email,status):
+    fname = nullMe(first_name)
+    lname = nullMe(last_name)
+    insert = f"INSERT INTO registeredusertable VALUES({id},'{membership_no}','',{fname},{lname},'{password}','{email}','{status}');"
+    return insert
+#id     | MembershipNo | MembershipName                              | OrgName          | Address1                 | Address2                     | Address3 | PostTown                | PostCode | Country        | PublishAddress | HomeTel        | SubTypeID | JoinedDate          | status
+
+def getSubTypeID(singlefamily , country):
+    if "UNITED KINGDOM" in country and singlefamily == "Family":
+        return 2
+    elif "UNITED KINGDOM" in country and singlefamily == "Single":
+        return 1
+    elif "UNITED KINGDOM" not in country and singlefamily == "Single":
+        return 4
+    elif "UNITED KINGDOM" not in country and singlefamily == "Family":
+        return 5
+    else:
+        return 1
+
+def get_mastermembershiptable_user_insert(start_id, item):
+    MembershipNo = item["MembershipNo"]
+    fullName = nullMe((item["Title1"] + " " + item["FirstName1"] + " " + item["LastName1"]).strip())
+    address1 = nullMe(item["Address1"])
+    address2 = nullMe(item["Address2"])
+    postTown = nullMe(item["PostTown"])
+    postCode = nullMe(item["PostCode"])
+    country = nullMe(item["Country"])
+    telno = nullMe("")
+    created_date = item["ags_subscription_start_date"]
+    singleFamily = getSubTypeID(item["SingleFamily"],country)
+    insert = f"INSERT INTO mastermembershiptable VALUES ({start_id},'{MembershipNo}',{fullName},NULL,{address1},NULL,{address2},{postTown},{postCode},{country},'N',{telno},{singleFamily},'{created_date}','published');"
+    return insert
+
+# INSERT INTO `mastermembertable` VALUES (15702,134745,'Test','Family','Family','Mr','stevefamilytest@atomicsmash.co.uk','01501 762972','','','','');
+#id    | MembershipID | Surname     | Forename | Inits    | Title | email                          | TelephoneWork   | TelephoneMobile | dob  | DateCourseEnd | ReasonLeft
+def get_mastermembertable_user_insert(mastermembertable_table_start_id, mastermembershiptable_table_start_id, item,email_db):
+    firstName = nullMe(item["FirstName1"].strip())
+    lastName = nullMe(item["LastName1"].strip())
+    title = nullMe(item["Title1"])
+    email = nullMe(email_db[item["MembershipNo"]]["Email"])
+    telno = nullMe("")
+    mastermembertable_user_insert = f"INSERT INTO mastermembertable VALUES ({mastermembertable_table_start_id}, {mastermembershiptable_table_start_id},{lastName},{firstName},{firstName}, {title},{email},{telno},'','','','');"
+    return mastermembertable_user_insert
+
+def is_valid_atomic_smash_user(item):
+    if item["MembershipNo"] != '' and item["LastName1"] != '':
+        return True
+    else:
+        return False
+
+atomic_smash_db = getCsv('MembershipNo','data/AGS-Member-Export/mailing-list-2021-10-26_0.csv',{})
+atomic_smash_db = getCsv('MembershipNo','data/AGS-Member-Export/mailing-list-2021-10-26_1000.csv',atomic_smash_db)
+atomic_smash_db = getCsv('MembershipNo','data/AGS-Member-Export/mailing-list-2021-10-26_2000.csv',atomic_smash_db)
+atomic_smash_db = getCsv('MembershipNo','data/AGS-Member-Export/mailing-list-2021-10-26_3000.csv',atomic_smash_db)
+
+email_db = getCsv('MembershipNo','data/ags-with-email-export/mailing-list-2021-11-18_0.csv',{})
+email_db = getCsv('MembershipNo','data/ags-with-email-export/mailing-list-2021-11-18_1000.csv',email_db)
+email_db = getCsv('MembershipNo','data/ags-with-email-export/mailing-list-2021-11-18_2000.csv',email_db)
+email_db = getCsv('MembershipNo','data/ags-with-email-export/mailing-list-2021-11-18_3000.csv',email_db)
+
+registered_user_table = getCsv('membershipno','data/oldalpine-export/registeredusertable-exp.csv', {})
+
+registered_user_table_start_id = 5332
+mastermembershiptable_table_start_id = 134746
+mastermembertable_table_start_id = 15703
+print("use alpines;")
+for item in atomic_smash_db.values():
+    if item["MembershipNo"] not in email_db:
+        pass
+        #print("missing member ship in email db for " + item["MembershipNo"])
+    elif item["MembershipNo"] not in registered_user_table and is_valid_atomic_smash_user(item):
+        email = email_db[item["MembershipNo"]]["Email"]
+        if(len(email) < 50):
+            primary_user = get_registered_user_insert(registered_user_table_start_id,item["MembershipNo"],item["FirstName1"],item["LastName1"],"",email,"primary")
+            registered_user_table_start_id = registered_user_table_start_id + 1
+            print(primary_user)
+            if(item["LastName2"] != ''):
+                secondary_user = get_registered_user_insert(registered_user_table_start_id,item["MembershipNo"],item["FirstName2"],item["LastName2"],"","dummy@deleme.com","unverified")
+                registered_user_table_start_id = registered_user_table_start_id + 1
+                print(secondary_user)
+
+            mastermembershiptable_user_insert = get_mastermembershiptable_user_insert(mastermembershiptable_table_start_id,item)
+            print(mastermembershiptable_user_insert)
+            mastermembershiptable_table_start_id = mastermembershiptable_table_start_id + 1
+            mastermembertable_user_insert = get_mastermembertable_user_insert(mastermembertable_table_start_id, mastermembershiptable_table_start_id,item,email_db)
+            print(mastermembertable_user_insert)
+            mastermembertable_table_start_id = mastermembertable_table_start_id + 1
+        else:
+          print("email too long) for " + item["MembershipNo"])
+    else:
+        pass
+        #print("ignoring existing member exists = " + item["MembershipNo"])
+
+
